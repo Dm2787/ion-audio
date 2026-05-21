@@ -1,6 +1,6 @@
 {
-  "name": "ION Radio",
-  "short_name": "ION Radio",
+  "name": "ION Audio",
+  "short_name": "ION Audio",
   "start_url": "./index.html",
   "display": "standalone",
   "background_color": "#000000",
