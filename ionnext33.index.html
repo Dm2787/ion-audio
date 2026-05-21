@@ -1,0 +1,1108 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>ION Radio Console v8.10</title>
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#ff1a1a">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <style>
+        :root {
+            --bg-color: #050505;
+            --accent-red: #ff1a1a;
+            --accent-blue: #00d2ff;
+            --neon-white: #ffffff;
+            --panel-bg: rgba(15, 15, 18, 0.85);
+        }
+
+        * { -webkit-tap-highlight-color: transparent !important; outline: none !important; user-select: none; box-sizing: border-box; }
+
+        body {
+            background-color: var(--bg-color);
+            background-image: 
+                radial-gradient(circle at center, #1a0505 0%, #050505 100%),
+                linear-gradient(rgba(255, 26, 26, 0.03) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(255, 26, 26, 0.03) 1px, transparent 1px);
+            background-size: 100% 100%, 30px 30px, 30px 30px;
+            color: var(--neon-white);
+            font-family: 'Segoe UI', sans-serif;
+            display: flex; justify-content: center; align-items: center;
+            min-height: 100dvh; margin: 0; overflow: hidden;
+            perspective: 1000px;
+        }
+
+        /* --- WYMUSZENIE WIDOKU PIONOWEGO PRZEZ CSS TRANSFORMS --- */
+        @media id-orientation-force, screen and (orientation: landscape) {
+            html, body {
+                width: 100vw;
+                height: 100vh;
+                overflow: hidden;
+            }
+            #ion-player, #splash-screen {
+                transform: rotate(-90deg);
+                width: 90vh !important;
+                height: 94vw !important;
+                max-width: none !important;
+                max-height: none !important;
+                transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            }
+        }
+
+        /* EKRAN POWITALNY SPLASH */
+        #splash-screen {
+            position: fixed; top: 0; left: 0; width: 100vw; height: 100dvh;
+            background: radial-gradient(circle at center, #150303 0%, #050505 100%);
+            display: flex; flex-direction: column; justify-content: center; align-items: center;
+            gap: 15px; z-index: 9999;
+            transition: opacity 0.8s cubic-bezier(0.4, 0, 0.2, 1), transform 0.8s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        #splash-screen.hidden {
+            opacity: 0; pointer-events: none; transform: scale(1.08);
+        }
+        .splash-logo {
+            transform: scale(1.6); margin-bottom: 15px;
+            animation: splash-glow 2.5s infinite ease-in-out;
+        }
+        .splash-text {
+            font-size: 2.2rem; font-weight: 900; letter-spacing: 8px;
+            margin-right: -8px;
+            text-shadow: 0 0 25px var(--accent-red); color: var(--neon-white);
+            opacity: 0; transform: translateY(15px);
+            animation: text-reveal 1.2s cubic-bezier(0.16, 1, 0.3, 1) forwards 0.3s;
+            text-align: center; width: 100%;
+        }
+        .splash-subtext {
+            font-size: 0.75rem; letter-spacing: 5px; 
+            margin-right: -5px;
+            color: #666; text-transform: uppercase;
+            font-weight: bold; opacity: 0; transform: translateY(10px);
+            animation: text-reveal 1.2s cubic-bezier(0.16, 1, 0.3, 1) forwards 0.7s;
+            text-align: center; width: 100%;
+        }
+        @keyframes text-reveal {
+            to { opacity: 1; transform: translateY(0); }
+        }
+        @keyframes splash-glow {
+            0%, 100% { filter: drop-shadow(0 0 4px rgba(255,26,26,0.3)); }
+            50% { filter: drop-shadow(0 0 30px rgba(255,26,26,0.7)); }
+        }
+
+        /* GŁÓWNY PANEL */
+        #ion-player {
+            background: var(--panel-bg);
+            backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+            width: 92vw; max-width: 440px; 
+            max-height: 96vh;
+            padding: 20px; border-radius: 24px;
+            border: 1px solid rgba(255, 26, 26, 0.2);
+            box-shadow: 0 40px 100px rgba(0,0,0,0.9);
+            position: relative;
+            display: flex;
+            flex-direction: column;
+            transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .header { display: flex; align-items: center; gap: 15px; margin-bottom: 15px; flex-shrink: 0; }
+        .logo-text { font-size: 1.8rem; font-weight: 900; letter-spacing: 5px; margin-right: -5px; text-shadow: 0 0 15px var(--accent-red); }
+        
+        .hexagon { 
+            width: 35px; height: 35px; background: var(--accent-red); 
+            clip-path: polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%);
+            display: flex; justify-content: center; align-items: center;
+            filter: drop-shadow(0 0 4px rgba(255,26,26,0.3));
+        }
+
+        .core {
+            width: 8px; height: 8px; background: white; border-radius: 50%;
+            box-shadow: 0 0 10px var(--accent-red);
+            animation: ion-pulse 1.5s infinite ease-in-out;
+        }
+
+        @keyframes ion-pulse {
+            0%, 100% { transform: scale(1); opacity: 1; box-shadow: 0 0 10px var(--accent-red); }
+            50% { transform: scale(1.2); opacity: 0.7; box-shadow: 0 0 20px var(--accent-red); }
+        }
+
+        /* KONTENER WYŚWIETLACZA I ANIMACJA SCROLLOWANIA TYTUŁU */
+        .display-unit { background: rgba(0,0,0,0.6); padding: 15px; border-radius: 12px; margin-bottom: 15px; flex-shrink: 0; }
+        
+        .title-box {
+            width: 100%;
+            overflow: hidden;
+            position: relative;
+            height: 1.2em;
+            margin-bottom: 4px;
+            display: flex;
+            justify-content: center;
+        }
+
+        #track-title {
+            font-size: 0.8rem;
+            color: var(--accent-red);
+            text-transform: uppercase;
+            font-weight: bold;
+            white-space: nowrap;
+            display: inline-block;
+            text-align: center;
+            width: max-content;
+            transition: color 0.2s ease;
+        }
+
+        /* Klasa dodawana dynamicznie przez JS, gdy tekst jest za długi */
+        .marquee-active {
+            animation: ion-marquee 10s linear infinite;
+            padding-left: 100%;
+        }
+
+        @keyframes ion-marquee {
+            0% { transform: translate3d(0, 0, 0); }
+            100% { transform: translate3d(-100%, 0, 0); }
+        }
+
+        .vis-container { position: relative; width: 100%; height: 75px; cursor: pointer; margin-top: 5px; }
+        #visualizer { width: 100%; height: 100%; display: block; }
+
+        .time-label { font-size: 0.9rem; letter-spacing: 0.5px; font-weight: bold; color: var(--accent-blue); text-shadow: 0 0 8px rgba(0, 210, 255, 0.4); font-family: monospace; }
+        .neon-label { font-size: 0.55rem; text-transform: uppercase; font-weight: bold; color: #888; }
+
+        .eq-wrapper { background: rgba(0, 0, 0, 0.4); border-radius: 12px; border: 1px solid rgba(255, 255, 255, 0.03); margin-bottom: 15px; padding: 10px 8px; flex-shrink: 0; }
+        .eq-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; padding: 0 5px; }
+        .eq-select {
+            background: rgba(255, 255, 255, 0.05); color: var(--accent-blue);
+            border: 1px solid var(--accent-blue); padding: 4px 8px; border-radius: 6px;
+            font-family: inherit; font-size: 0.7rem; font-weight: bold; outline: none; cursor: pointer;
+            box-shadow: 0 0 5px rgba(0, 210, 255, 0.2); transition: all 0.2s ease;
+        }
+        .eq-select option { background: #1a1a1a; color: white; }
+        .eq-select:focus { box-shadow: 0 0 10px var(--accent-blue); }
+
+        .eq-console { display: flex; justify-content: space-between; }
+        .slider-group { display: flex; flex-direction: column; align-items: center; gap: 4px; flex: 1; }
+        .v-slider { -webkit-appearance: slider-vertical; width: 14px; height: 90px; cursor: pointer; accent-color: var(--accent-blue); }
+        .indicator { font-size: 0.55rem; color: var(--accent-blue); font-family: monospace; font-weight: bold; }
+
+        .volume-section { display: flex; align-items: center; justify-content: space-between; background: rgba(255,255,255,0.02); padding: 8px 12px; border-radius: 10px; margin-bottom: 15px; flex-shrink: 0; }
+        
+        /* KONTROLKI AUDIO */
+        .controls { display: flex; justify-content: center; align-items: center; gap: 10px; margin-bottom: 15px; flex-shrink: 0; }
+        
+        .btn-ctrl { 
+            background: rgba(255,26,26,0.06); 
+            border: 1px solid var(--accent-red); 
+            border-radius: 50%; 
+            width: 44px; height: 44px; cursor: pointer; display: flex; justify-content: center; align-items: center; 
+            box-shadow: 0 0 10px rgba(255,26,26,0.35);
+            transition: transform 0.1s cubic-bezier(0.175, 0.885, 0.32, 1.275), box-shadow 0.1s ease, background 0.1s ease; 
+        }
+        
+        #play-btn {
+            width: 56px; height: 56px;
+            will-change: transform, box-shadow;
+            transition: transform 0.06s ease-out, box-shadow 0.06s ease-out;
+        }
+        
+        .btn-ctrl:active, .btn-ctrl.pulse-trigger { 
+            transform: scale(0.88) !important; 
+            background: rgba(255,26,26,0.30) !important; 
+            box-shadow: 0 0 24px var(--accent-red), 0 0 40px rgba(255,26,26,0.75) !important; 
+        }
+        
+        .btn-ctrl.active { 
+            background: rgba(255,26,26,0.20); 
+            box-shadow: 0 0 16px var(--accent-red), 0 0 28px rgba(255, 26, 26, 0.65); 
+        }
+        
+        .btn-ctrl.active-blue { transform: scale(0.95); border-color: var(--accent-blue); background: rgba(0, 210, 255, 0.12); box-shadow: 0 0 14px var(--accent-blue), 0 0 25px rgba(0, 210, 255, 0.5); animation: activeBluePulse 1.8s infinite; }
+        
+        .btn-ctrl svg { fill: white; width: 18px; height: 18px; transition: 0.2s ease; filter: drop-shadow(0 0 3px rgba(255,255,255,0.6)); }
+        #play-btn svg { width: 22px; height: 22px; }
+        .btn-ctrl.active svg { filter: drop-shadow(0 0 8px var(--accent-red)); }
+        .btn-ctrl.active-blue svg { filter: drop-shadow(0 0 6px var(--accent-blue)); }
+
+        @keyframes activeBluePulse { 0%, 100% { box-shadow: 0 0 12px var(--accent-blue), 0 0 25px rgba(0, 210, 255, 0.45); } 50% { box-shadow: 0 0 18px var(--accent-blue), 0 0 35px rgba(0, 210, 255, 0.7); } }
+
+        /* SEKCJA USTAWIEŃ */
+        .xfade-settings { margin-bottom: 15px; padding: 10px; background: rgba(255,255,255,0.02); border-radius: 12px; transition: opacity 0.3s ease, transform 0.3s ease; flex-shrink: 0; }
+        .xfade-settings.disabled { opacity: 0.25; pointer-events: none; transform: scale(0.99); }
+        
+        /* PLAYLISTA */
+        .playlist { 
+            flex-grow: 1;
+            overflow-y: auto; 
+            border-top: 1px solid rgba(255,255,255,0.05); 
+            margin-top: 5px;
+            padding-right: 3px;
+            -webkit-overflow-scrolling: touch; 
+            scrollbar-width: thin;
+            scrollbar-color: var(--accent-red) rgba(0, 0, 0, 0.3);
+        }
+
+        .playlist::-webkit-scrollbar { width: 4px; }
+        .playlist::-webkit-scrollbar-track { background: rgba(0, 0, 0, 0.3); border-radius: 10px; }
+        .playlist::-webkit-scrollbar-thumb { background: var(--accent-red); border-radius: 10px; box-shadow: 0 0 8px var(--accent-red); }
+
+        .track-item { padding: 8px; color: #666; display: flex; justify-content: space-between; align-items: center; font-size: 0.75rem; border-radius: 4px; cursor: pointer; }
+        .track-item.active { color: var(--neon-white); background: rgba(255, 26, 26, 0.15); }
+        .track-item:hover { background: rgba(255, 255, 255, 0.03); color: #aaa; }
+        .track-name { flex-grow: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; padding-right: 10px; }
+        .track-del { font-size: 1.1rem; font-weight: bold; color: #555; padding: 0 6px; cursor: pointer; border-radius: 40%; transition: color 0.15s ease; }
+        .track-del:hover { color: var(--accent-red) !important; text-shadow: 0 0 8px var(--accent-red); }
+        
+        .add-btn { 
+            display: block; width: 100%; padding: 12px; background: rgba(255, 26, 26, 0.05); border: 1px dashed rgba(255, 26, 26, 0.3); color: white; text-align: center; font-size: 0.7rem; border-radius: 10px; 
+            margin-top: 10px; 
+            margin-bottom: calc(12px + env(safe-area-inset-bottom));
+            cursor: pointer; 
+            transition: transform 0.1s ease, background-color 0.1s ease, border-color 0.1s ease, box-shadow 0.1s ease;
+            flex-shrink: 0;
+        }
+        .add-btn.active { border-color: var(--accent-red); border-style: solid; background: rgba(255, 26, 26, 0.15); }
+        
+        .add-btn:active {
+            transform: scale(0.96);
+            background: rgba(255, 26, 26, 0.25);
+            border-color: var(--accent-red);
+            border-style: solid;
+            box-shadow: 0 0 14px rgba(255, 26, 26, 0.4);
+        }
+    </style>
+</head>
+<body>
+
+<div id="splash-screen" onclick="ION.dismissSplash()">
+    <div class="hexagon splash-logo">
+        <div style="width:80%; height:80%; background:#000; clip-path:inherit; display:flex; justify-content:center; align-items:center;">
+            <div class="core"></div>
+        </div>
+    </div>
+    <div class="splash-text">ION</div>
+    <div class="splash-subtext">Audio System</div>
+</div>
+
+<div id="ion-player">
+    <div class="header">
+        <div class="hexagon"><div style="width:80%; height:80%; background:#000; clip-path:inherit; display:flex; justify-content:center; align-items:center;"><div class="core"></div></div></div>
+        <div class="logo-text">ION</div>
+    </div>
+
+    <div class="display-unit">
+        <div class="title-box" id="ion-title-box">
+            <div id="track-title">TRYB CZUWANIA // ION CORE</div>
+        </div>
+        <div class="vis-container" id="vis-toggle-area">
+            <canvas id="visualizer"></canvas>
+        </div>
+        <div style="display:flex; justify-content:space-between; margin-top:10px; align-items: center;">
+            <span class="time-label" id="time-cur">0:00</span>
+            <span class="time-label" id="time-dur">0:00</span>
+        </div>
+        <input type="range" id="seek" style="width:100%; accent-color: var(--accent-red);" value="0">
+    </div>
+
+    <div class="eq-wrapper">
+        <div class="eq-header">
+            <span class="neon-label" style="color:var(--neon-white)">KOREKTOR (EQ)</span>
+            <select id="eq-preset-selector" class="eq-select">
+                <option value="normal">Normalna</option>
+                <option value="classical">Classical</option>
+                <option value="dance">Dance</option>
+                <option value="straightness">Straightness</option>
+                <option value="folk">Folk</option>
+                <option value="heavy_metal">Heavy Metal</option>
+                <option value="hip_hop">Hip Hop</option>
+                <option value="jazz">Jazz</option>
+                <option value="pop">Pop</option>
+                <option value="rock" selected>Rock</option>
+                <option value="acoustic">Acoustic</option>
+                <option value="bass_boost">Bass Boost</option>
+                <option value="treble_boost">Treble Boost</option>
+                <option value="vocal_boost">Vocal Boost</option>
+                <option value="headphones">Słuchawki</option>
+                <option value="deep">Deep</option>
+                <option value="electronic">Electronic</option>
+                <option value="latynoska">Latynoska</option>
+                <option value="loud">Loud</option>
+                <option value="lounge">Lounge</option>
+                <option value="piano">Piano</option>
+                <option value="rb">RB</option>
+                <option value="custom">Własne</option>
+            </select>
+        </div>
+        <div class="eq-console" id="eq-container"></div>
+    </div>
+
+    <div class="volume-section">
+        <label class="neon-label" style="color:var(--neon-white)">GŁOŚNOŚĆ MASTER</label>
+        <input type="range" id="vol-ctrl" min="0" max="1" step="0.01" value="0.43" style="width: 55%; accent-color: var(--accent-red);">
+        <span class="indicator" id="vol-val" style="color:var(--accent-red); width:35px; text-align:right;">43%</span>
+    </div>
+
+    <div class="controls">
+        <button class="btn-ctrl" id="xfade-btn"><svg viewBox="0 0 24 24"><path d="M17 17h-4v2h4v3l4-4-4-4v3zM7 7h4V5H7V2L3 6l4 4V7zm6 10l-4-4H3v2h5.17L13 19.83V17zm5-10V4.17L12.83 9H17z"/></svg></button>
+        <button class="btn-ctrl" id="prev"><svg viewBox="0 0 24 24"><path d="M6 6h2v12H6zm3.5 6l8.5 6V6z"/></svg></button>
+        <button class="btn-ctrl" id="play-btn"><svg id="play-icon" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg></button>
+        <button class="btn-ctrl" id="next"><svg viewBox="0 0 24 24"><path d="M6 18l8.5-6L6 6v12zM16 6h2v12h-2z"/></svg></button>
+        <button class="btn-ctrl" id="mode-btn"><svg id="mode-icon" viewBox="0 0 24 24"><path d="M7 7h10v3l4-4-4-4v3H5v6h2V7zm10 10H7v-3l-4 4 4 4v-3h12v-6h-2v4z"/></svg></button>
+    </div>
+
+    <div class="xfade-settings disabled" id="xfade-container">
+        <div style="display:flex; justify-content:space-between; width:100%; margin-bottom:5px;">
+            <label class="neon-label">CZAS PRZEJŚCIA</label>
+            <span class="indicator" id="xfade-val" style="color:var(--accent-red)">5s</span>
+        </div>
+        <input type="range" id="xfade-ctrl" min="0" max="20" value="5" style="width:100%; accent-color: var(--accent-red);" disabled>
+    </div>
+
+    <div class="playlist" id="list"></div>
+    <label for="f-in" class="add-btn">+ DODAJ MUZYKĘ</label>
+    <input type="file" id="f-in" multiple accept="audio/*" style="display:none;">
+</div>
+
+<script>
+    const ION = {
+        playlist: [], currentIndex: 0, db: null, ctx: null,
+        deckA: new Audio(), deckB: new Audio(), activeDeck: 'A',
+        gainA: null, gainB: null, masterGain: null, limiter: null,
+        analyser: null,
+        
+        eqFrequencies: [31, 62, 125, 250, 500, 1000, 2000, 4000, 8000, 16000],
+        eqFilters: [], 
+        
+        eqPresets: {
+            normal: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+            classical: [4, 3, 2, 1, -1, -1, 0, 2, 3, 4],
+            dance: [6, 5, 2, 0, -2, -4, -2, 0, 2, 4],
+            straightness: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+            folk: [2, 1, 0, 1, 2, 2, 1, 1, 0, 0],
+            heavy_metal: [5, 4, 3, 2, 1, 2, 3, 4, 4, 5],
+            hip_hop: [5, 4, 1, 3, -1, -1, 1, -1, 3, 4],
+            jazz: [3, 2, 1, 2, -1, -1, 0, 1, 2, 3],
+            pop: [-1, -1, 0, 2, 3, 3, 1, 0, -1, -2],
+            rock: [4, 1, -3, -6, -3, 3, 6, 7, 7, 7], 
+            acoustic: [3, 2, 1, 1, 1, 2, 3, 3, 2, 1],
+            bass_boost: [8, 7, 5, 3, 1, 0, 0, 0, 0, 0],
+            treble_boost: [0, 0, 0, 0, 0, 1, 3, 5, 7, 8],
+            vocal_boost: [-2, -4, -4, 1, 4, 5, 4, 3, 1, -1],
+            headphones: [3, 2, 1, -1, -1, 1, 2, 3, 4, 4],
+            deep: [5, 4, 3, 1, 0, -1, -2, -3, -3, -4],
+            electronic: [4, 4, 2, 0, -1, 2, 1, 2, 4, 5],
+            latynoska: [2, 2, 0, 0, -1, -1, -1, 2, 3, 3],
+            loud: [5, 4, -1, -1, -2, -1, -1, 4, 5, 5],
+            lounge: [-2, -1, 1, 2, 1, 0, -1, 1, 2, 1],
+            piano: [2, 2, 1, 0, 1, 1, 2, 3, 2, 2],
+            rb: [3, 4, 4, 2, -1, -1, 1, 2, 3, 4],
+            custom: null
+        },
+
+        playbackMode: 'normal', 
+        isXFade: false, fading: false,
+        notificationTimeout: null,
+        icons: { 
+            play: 'M8 5v14l11-7z', 
+            pause: 'M6 19h4V5H6v14zm8-14v14h4V5h-4z',
+            loop: 'M7 7h10v3l4-4-4-4v3H5v6h2V7zm10 10H7v-3l-4 4 4 4v-3h12v-6h-2v4z',
+            shuffle: 'M10.59 9.17L5.41 4 4 5.41l5.17 5.17 1.42-1.41zM14.5 4l2.04 2.04L4 18.59 5.41 20 17.96 7.46 20 9.5V4h-5.5zm.33 9.41l-1.41 1.41 3.13 3.13L14.5 20H20v-5.5l-2.04 2.04-3.13-3.13z'
+        },
+        
+        visualizerSmoothData: new Array(20).fill(0),
+        visualizerPeaks: new Array(20).fill(0),       
+        visualizerHoldTimers: new Array(20).fill(0),  
+        visualizerMode: 'bars', 
+        vuLeftAngle: -Math.PI * 0.75,  
+        vuRightAngle: -Math.PI * 0.75, 
+
+        async init() {
+            setTimeout(() => {
+                this.dismissSplash();
+            }, 2500);
+
+            try {
+                this.buildEQSliders();
+                this.dom();
+                await this.initDB();
+                this.events();
+                this.loadFromDB();
+                this.setupMediaSession();
+                this.registerServiceWorker();
+                this.setupResizeFix();
+            } catch (err) {
+                console.error("Błąd ładowania ION:", err);
+            }
+        },
+
+        dismissSplash() {
+            const splash = document.getElementById('splash-screen');
+            if (splash) {
+                splash.classList.add('hidden');
+            }
+        },
+
+        setupResizeFix() {
+            const resizeCanvas = () => {
+                if (this.canvas) {
+                    this.canvas.width = this.canvas.offsetWidth;
+                    this.canvas.height = 75;
+                }
+                this.checkTitleMarquee(); // RE-CHECK PRZY ZMIANIE ORIENTACJI LUB ROZMIARU EKRANU
+            };
+            window.addEventListener('resize', () => {
+                setTimeout(resizeCanvas, 150);
+            });
+            window.addEventListener('orientationchange', () => {
+                setTimeout(resizeCanvas, 150);
+            });
+        },
+
+        buildEQSliders() {
+            const container = document.getElementById('eq-container');
+            const defaultPreset = this.eqPresets.rock;
+            
+            container.innerHTML = this.eqFrequencies.map((freq, index) => {
+                const displayLabel = freq >= 1000 ? (freq / 1000) + 'k' : freq;
+                const val = defaultPreset[index];
+                return `
+                    <div class="slider-group">
+                        <span class="indicator" id="eq-val-${freq}">${val > 0 ? "+" : ""}${val}dB</span>
+                        <input type="range" class="v-slider eq-range" id="eq-ctrl-${freq}" min="-12" max="12" value="${val}">
+                        <label class="neon-label">${displayLabel}</label>
+                    </div>
+                `;
+            }).join('');
+        },
+
+        dom() {
+            this.canvas = document.getElementById('visualizer');
+            this.canvasCtx = this.canvas.getContext('2d');
+            this.playIcon = document.getElementById('play-icon').querySelector('path');
+            this.modeIcon = document.getElementById('mode-icon').querySelector('path');
+            this.titleEl = document.getElementById('track-title');
+            this.titleBox = document.getElementById('ion-title-box');
+            this.playBtn = document.getElementById('play-btn');
+            this.canvas.width = this.canvas.offsetWidth;
+            this.canvas.height = 75;
+            this.deckA.crossOrigin = this.deckB.crossOrigin = "anonymous";
+        },
+
+        initDB() {
+            return new Promise((resolve) => {
+                try {
+                    const req = indexedDB.open("ION_V8_AUDIO", 1);
+                    req.onupgradeneeded = e => {
+                        e.target.result.createObjectStore("songs", {keyPath: "id", autoIncrement: true});
+                    };
+                    req.onsuccess = e => { 
+                        this.db = e.target.result; 
+                        resolve(); 
+                    };
+                    req.onerror = e => { 
+                        console.error("Błąd bazy danych:", e); 
+                        resolve(); 
+                    };
+                } catch (err) {
+                    resolve();
+                }
+            });
+        },
+
+        // DYNAMICZNE SPRAWDZANIE DŁUGOŚCI TEKSTU I URUCHAMIANIE MARQUEE
+        checkTitleMarquee() {
+            if (!this.titleEl || !this.titleBox) return;
+            
+            // Usuwamy na chwilę klasę, by zmierzyć rzeczywisty rozmiar tekstu bez transformacji animacji
+            this.titleEl.classList.remove('marquee-active');
+            this.titleBox.style.justifyContent = 'center';
+
+            if (this.titleEl.offsetWidth > this.titleBox.offsetWidth) {
+                this.titleEl.classList.add('marquee-active');
+                this.titleBox.style.justifyContent = 'flex-start';
+                
+                // Dostosowanie prędkości animacji zależnie od długości tekstu (ok. 30px na sekundę)
+                const duration = (this.titleEl.offsetWidth / 30) + 4;
+                this.titleEl.style.animationDuration = duration + 's';
+            }
+        },
+
+        updateTitle(text, colorHex) {
+            this.titleEl.style.color = colorHex || "var(--accent-red)";
+            this.titleEl.innerText = text;
+            this.checkTitleMarquee();
+        },
+
+        showNotification(text, colorHex) {
+            clearTimeout(this.notificationTimeout);
+            this.updateTitle(text, colorHex);
+            
+            this.notificationTimeout = setTimeout(() => {
+                const currentTrack = this.playlist[this.currentIndex];
+                const defaultText = currentTrack ? currentTrack.name : "TRYB CZUWANIA // ION CORE";
+                this.updateTitle(defaultText, "var(--accent-red)");
+            }, 2000);
+        },
+
+        setupAudioPipeline() {
+            if (this.ctx) return;
+            this.ctx = new (window.AudioContext || window.webkitAudioContext)();
+            this.analyser = this.ctx.createAnalyser();
+            
+            this.analyser.smoothingTimeConstant = 0.65;
+            this.analyser.fftSize = 256;
+            
+            this.gainA = this.ctx.createGain();
+            this.gainB = this.ctx.createGain();
+            this.masterGain = this.ctx.createGain();
+            
+            this.gainA.gain.value = 1.0;
+            this.gainB.gain.value = 0.0;
+            this.masterGain.gain.value = parseFloat(document.getElementById('vol-ctrl').value);
+            
+            this.limiter = this.ctx.createDynamicsCompressor();
+            this.limiter.threshold.setValueAtTime(-1.5, this.ctx.currentTime);
+            
+            this.eqFilters = this.eqFrequencies.map((freq) => {
+                const filter = this.ctx.createBiquadFilter();
+                filter.type = "peaking";
+                filter.frequency.setValueAtTime(freq, this.ctx.currentTime);
+                filter.Q.setValueAtTime(1.0, this.ctx.currentTime);
+                const sliderVal = parseFloat(document.getElementById(`eq-ctrl-${freq}`).value);
+                filter.gain.setValueAtTime(sliderVal, this.ctx.currentTime);
+                return filter;
+            });
+
+            this.ctx.createMediaElementSource(this.deckA).connect(this.gainA).connect(this.masterGain);
+            this.ctx.createMediaElementSource(this.deckB).connect(this.gainB).connect(this.masterGain);
+            
+            let currentNode = this.masterGain;
+            this.eqFilters.forEach(filter => { currentNode.connect(filter); currentNode = filter; });
+            currentNode.connect(this.limiter).connect(this.analyser).connect(this.ctx.destination);
+            this.draw();
+        },
+
+        draw() {
+            const data = new Uint8Array(this.analyser.frequencyBinCount);
+            const render = () => {
+                requestAnimationFrame(render);
+                if (!this.analyser) return;
+                
+                this.analyser.getByteFrequencyData(data);
+                
+                if (this.playBtn && this.playBtn.classList.contains('active')) {
+                    const bassLevel = (data[0] + data[1] + data[2] + data[3]) / 4; 
+                    const ratio = bassLevel / 255;
+                    
+                    if (ratio > 0.05) {
+                        const dynamicScale = 0.95 + (ratio * 0.12);
+                        const shadowRadius = 16 + (ratio * 24);
+                        const spreadRadius = 2 + (ratio * 12);
+                        
+                        this.playBtn.style.transform = `scale(${dynamicScale})`;
+                        this.playBtn.style.boxShadow = `0 0 ${shadowRadius}px rgba(255, 26, 26, ${0.4 + ratio * 0.6}), 0 0 ${spreadRadius}px var(--accent-red)`;
+                    } else {
+                        this.playBtn.style.transform = 'scale(0.95)';
+                        this.playBtn.style.boxShadow = '0 0 16px var(--accent-red), 0 0 28px rgba(255, 26, 26, 0.65)';
+                    }
+                } else if (this.playBtn) {
+                    this.playBtn.style.transform = '';
+                    this.playBtn.style.boxShadow = '';
+                }
+
+                this.canvasCtx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+
+                if (this.visualizerMode === 'bars') {
+                    const barsCount = 20;
+                    const barWidth = this.canvas.width / barsCount;
+                    
+                    for(let i = 0; i < barsCount; i++) {
+                        const percent = i / barsCount;
+                        const logIndex = Math.floor(Math.pow(percent, 1.5) * (data.length * 0.85));
+                        let rawValue = data[logIndex] || 0;
+                        
+                        if (i > 6) rawValue *= (1 + (i - 6) * 0.04);
+                        if (rawValue > 255) rawValue = 255;
+                        
+                        if (rawValue >= this.visualizerSmoothData[i]) {
+                            this.visualizerSmoothData[i] = rawValue;
+                        } else {
+                            this.visualizerSmoothData[i] -= 4.5;
+                            if (this.visualizerSmoothData[i] < 0) this.visualizerSmoothData[i] = 0;
+                        }
+                        
+                        const h = (this.visualizerSmoothData[i] / 255) * this.canvas.height;
+                        
+                        if (h >= this.visualizerPeaks[i]) {
+                            this.visualizerPeaks[i] = h;
+                            this.visualizerHoldTimers[i] = 22; 
+                        } else {
+                            if (this.visualizerHoldTimers[i] > 0) {
+                                this.visualizerHoldTimers[i]--;
+                            } else {
+                                this.visualizerPeaks[i] -= 1.4; 
+                                if (this.visualizerPeaks[i] < 0) this.visualizerPeaks[i] = 0;
+                            }
+                        }
+
+                        this.canvasCtx.fillStyle = h > (this.canvas.height * 0.6) ? '#ff1a1a' : '#ffffff';
+                        this.canvasCtx.fillRect(i * barWidth, this.canvas.height - h, barWidth - 3, h);
+
+                        if (this.visualizerPeaks[i] > 0) {
+                            const peakY = this.canvas.height - this.visualizerPeaks[i];
+                            this.canvasCtx.fillStyle = this.visualizerPeaks[i] > (this.canvas.height * 0.6) ? '#ff1a1a' : '#ffffff';
+                            this.canvasCtx.fillRect(i * barWidth, peakY, barWidth - 3, 2);
+                        }
+                    }
+                } else {
+                    let sumLeft = 0, sumRight = 0;
+                    const midPoint = Math.floor(data.length / 2);
+                    
+                    for (let i = 0; i < midPoint; i++) sumLeft += data[i];
+                    for (let i = midPoint; i < data.length; i++) sumRight += data[i];
+                    
+                    const targetLeft = (sumLeft / (midPoint * 255)) * 1.35;
+                    const targetRight = (sumRight / ((data.length - midPoint) * 255)) * 1.65;
+                    
+                    const startAngle = -Math.PI * 0.8;
+                    const endAngle = -Math.PI * 0.2;
+                    const totalRange = endAngle - startAngle;
+                    
+                    const destLeftAngle = startAngle + (Math.min(targetLeft, 1) * totalRange);
+                    const destRightAngle = startAngle + (Math.min(targetRight, 1) * totalRange);
+                    
+                    this.vuLeftAngle += (destLeftAngle - this.vuLeftAngle) * 0.55;
+                    this.vuRightAngle += (destRightAngle - this.vuRightAngle) * 0.55;
+                    
+                    this.vuLeftAngle += (startAngle - this.vuLeftAngle) * 0.20;
+                    this.vuRightAngle += (startAngle - this.vuRightAngle) * 0.20;
+                    
+                    const w = this.canvas.width;
+                    const h = this.canvas.height;
+                    const centers = [w * 0.26, w * 0.74]; 
+                    const radius = h * 0.85;              
+                    const centerY = h * 0.95;             
+                    
+                    centers.forEach((cx, idx) => {
+                        const currentAngle = idx === 0 ? this.vuLeftAngle : this.vuRightAngle;
+                        
+                        this.canvasCtx.lineWidth = 2;
+                        this.canvasCtx.strokeStyle = 'rgba(255,255,255,0.18)';
+                        this.canvasCtx.beginPath();
+                        this.canvasCtx.arc(cx, centerY, radius, startAngle, endAngle);
+                        this.canvasCtx.stroke();
+                        
+                        this.canvasCtx.strokeStyle = '#ff1a1a';
+                        this.canvasCtx.lineWidth = 3;
+                        this.canvasCtx.beginPath();
+                        this.canvasCtx.arc(cx, centerY, radius, startAngle + totalRange * 0.72, endAngle);
+                        this.canvasCtx.stroke();
+                        
+                        this.canvasCtx.fillStyle = 'rgba(255,255,255,0.3)';
+                        for (let j = 0; j <= 5; j++) {
+                            const dotAngle = startAngle + (j / 5) * totalRange;
+                            const dx = cx + Math.cos(dotAngle) * (radius - 5);
+                            const dy = centerY + Math.sin(dotAngle) * (radius - 5);
+                            this.canvasCtx.beginPath();
+                            this.canvasCtx.arc(dx, dy, j === 4 || j === 5 ? 1.5 : 1, 0, Math.PI * 2);
+                            this.canvasCtx.fill();
+                        }
+                        
+                        this.canvasCtx.fillStyle = idx === 0 ? 'var(--accent-red)' : 'var(--accent-blue)';
+                        this.canvasCtx.font = 'bold 8px sans-serif';
+                        this.canvasCtx.textAlign = 'center';
+                        this.canvasCtx.fillText(idx === 0 ? "CH L" : "CH R", cx, h * 0.45);
+                        
+                        this.canvasCtx.fillStyle = '#444';
+                        this.canvasCtx.font = '6px monospace';
+                        this.canvasCtx.fillText("VU", cx, h * 0.65);
+                        
+                        const handLength = radius - 2;
+                        const hx = cx + Math.cos(currentAngle) * handLength;
+                        const hy = centerY + Math.sin(currentAngle) * handLength;
+                        
+                        this.canvasCtx.strokeStyle = 'rgba(0,0,0,0.5)';
+                        this.canvasCtx.lineWidth = 2;
+                        this.canvasCtx.beginPath();
+                        this.canvasCtx.moveTo(cx + 2, centerY);
+                        this.canvasCtx.lineTo(hx + 2, hy + 1);
+                        this.canvasCtx.stroke();
+                        
+                        this.canvasCtx.strokeStyle = currentAngle > (startAngle + totalRange * 0.72) ? '#ff1a1a' : '#ffffff';
+                        this.canvasCtx.lineWidth = 1.5;
+                        this.canvasCtx.beginPath();
+                        this.canvasCtx.moveTo(cx, centerY);
+                        this.canvasCtx.lineTo(hx, hy);
+                        this.canvasCtx.stroke();
+                        
+                        this.canvasCtx.fillStyle = '#222';
+                        this.canvasCtx.beginPath();
+                        this.canvasCtx.arc(cx, centerY, 4, 0, Math.PI * 2);
+                        this.canvasCtx.fill();
+                        this.canvasCtx.strokeStyle = '#555';
+                        this.canvasCtx.lineWidth = 1;
+                        this.canvasCtx.stroke();
+                    });
+                }
+            };
+            render();
+        },
+
+        get activeAudio() { return this.activeDeck === 'A' ? this.deckA : this.deckB; },
+        get inactiveAudio() { return this.activeDeck === 'A' ? this.deckB : this.activeDeck === 'B' ? this.deckA : null; },
+        get activeGain() { return this.activeDeck === 'A' ? this.gainA : this.gainB; },
+        get inactiveGain() { return this.activeDeck === 'A' ? this.gainB : this.gainA; },
+
+        events() {
+            document.getElementById('play-btn').onclick = () => this.toggle();
+            document.getElementById('f-in').onchange = e => this.saveFiles(e.target.files);
+            
+            document.getElementById('vis-toggle-area').onclick = () => {
+                if (this.visualizerMode === 'bars') {
+                    this.visualizerMode = 'vu';
+                    this.showNotification("WSKAŹNIK: ANALOG VU METER", "var(--accent-blue)");
+                } else {
+                    this.visualizerMode = 'bars';
+                    this.showNotification("WSKAŹNIK: SPEKTRUM LOGARYTMICZNE", "var(--accent-red)");
+                }
+            };
+
+            document.getElementById('prev').onclick = (e) => {
+                const btn = e.currentTarget;
+                btn.classList.add('pulse-trigger'); 
+                setTimeout(() => btn.classList.remove('pulse-trigger'), 140); 
+                this.move(-1);
+            };
+
+            document.getElementById('next').onclick = (e) => {
+                const btn = e.currentTarget;
+                btn.classList.add('pulse-trigger'); 
+                setTimeout(() => btn.classList.remove('pulse-trigger'), 140); 
+                this.move(1);
+            };
+            
+            document.getElementById('mode-btn').onclick = (e) => { 
+                const btn = e.currentTarget;
+                if (this.playbackMode === 'normal') {
+                    this.playbackMode = 'loop';
+                    btn.classList.add('active'); btn.classList.remove('active-blue');
+                    this.modeIcon.setAttribute('d', this.icons.loop);
+                    this.showNotification("PĘTLA UTWORU", "var(--accent-red)");
+                } else if (this.playbackMode === 'loop') {
+                    this.playbackMode = 'shuffle';
+                    btn.classList.remove('active'); btn.classList.add('active-blue');
+                    this.modeIcon.setAttribute('d', this.icons.shuffle);
+                    this.showNotification("ODTWARZANIE LOSOWE", "var(--accent-blue)");
+                } else {
+                    this.playbackMode = 'normal';
+                    btn.classList.remove('active'); btn.classList.remove('active-blue');
+                    this.modeIcon.setAttribute('d', this.icons.loop);
+                    this.showNotification("ODTWARZANIE STANDARDOWE", "var(--neon-white)");
+                }
+            };
+            
+            document.getElementById('xfade-btn').onclick = (e) => { 
+                this.isXFade = !this.isXFade; 
+                e.currentTarget.classList.toggle('active', this.isXFade); 
+                const container = document.getElementById('xfade-container');
+                const slider = document.getElementById('xfade-ctrl');
+                if (this.isXFade) {
+                    container.classList.remove('disabled'); slider.removeAttribute('disabled');
+                    this.showNotification("PŁYNNE PRZEJŚCIE: WŁĄCZONE", "var(--accent-red)");
+                } else {
+                    container.classList.add('disabled'); slider.setAttribute('disabled', 'true');
+                    this.showNotification("PŁYNNE PRZEJŚCIE: WYŁĄCZONE", "var(--neon-white)");
+                }
+            };
+
+            document.getElementById('eq-preset-selector').onchange = (e) => {
+                const presetName = e.target.value;
+                if (presetName === 'custom') return;
+                
+                const presetValues = this.eqPresets[presetName];
+                this.eqFrequencies.forEach((freq, index) => {
+                    const val = presetValues[index];
+                    const slider = document.getElementById(`eq-ctrl-${freq}`);
+                    const label = document.getElementById(`eq-val-${freq}`);
+                    
+                    slider.value = val;
+                    label.innerText = (val > 0 ? "+" : "") + val + "dB";
+                    
+                    if (this.eqFilters[index]) {
+                        this.eqFilters[index].gain.setValueAtTime(val, this.ctx.currentTime);
+                    }
+                });
+                const displayTitle = e.target.options[e.target.selectedIndex].text.toUpperCase();
+                this.showNotification(`EQ: ${displayTitle}`, "var(--accent-blue)");
+            };
+
+            this.eqFrequencies.forEach((freq, index) => {
+                document.getElementById(`eq-ctrl-${freq}`).oninput = (e) => {
+                    const val = parseInt(e.target.value);
+                    document.getElementById(`eq-val-${freq}`).innerText = (val > 0 ? "+" : "") + val + "dB";
+                    document.getElementById('eq-preset-selector').value = 'custom';
+                    
+                    if (this.eqFilters[index]) {
+                        this.eqFilters[index].gain.setValueAtTime(val, this.ctx.currentTime);
+                    }
+                };
+            });
+
+            document.getElementById('vol-ctrl').oninput = (e) => {
+                const val = parseFloat(e.target.value);
+                document.getElementById('vol-val').innerText = Math.round(val * 100) + "%";
+                if(this.masterGain) this.masterGain.gain.setValueAtTime(val, this.ctx.currentTime);
+            };
+
+            document.getElementById('xfade-ctrl').oninput = (e) => {
+                document.getElementById('xfade-val').innerText = e.target.value + "s";
+                this.showNotification(`CZAS PRZEJŚCIA: ${e.target.value}s`, "var(--accent-red)");
+            };
+
+            const seek = document.getElementById('seek');
+            seek.oninput = (e) => {
+                const audio = this.activeAudio;
+                if(audio.duration) {
+                    const targetTime = (parseFloat(e.target.value) / 100) * audio.duration;
+                    
+                    if (this.ctx && this.activeGain) {
+                        const now = this.ctx.currentTime;
+                        const g = this.activeGain.gain;
+                        g.setValueAtTime(g.value, now);
+                        g.linearRampToValueAtTime(0.01, now + 0.01);
+                        
+                        setTimeout(() => {
+                            audio.currentTime = targetTime;
+                            g.linearRampToValueAtTime(1.0, this.ctx.currentTime + 0.02);
+                        }, 10);
+                    } else {
+                        audio.currentTime = targetTime;
+                    }
+                }
+            };
+
+            const handleTimeUpdate = (e) => {
+                if (this.fading && e.target !== this.activeAudio) return;
+                
+                const audio = this.activeAudio;
+                seek.value = (audio.currentTime / audio.duration) * 100 || 0;
+                document.getElementById('time-cur').innerText = this.fmt(audio.currentTime);
+                document.getElementById('time-dur').innerText = this.fmt(audio.duration);
+
+                if (this.isXFade && audio.duration && !this.fading) {
+                    const xFadeDuration = parseFloat(document.getElementById('xfade-ctrl').value);
+                    if (audio.duration - audio.currentTime <= xFadeDuration && xFadeDuration > 0) this.triggerCrossfade(xFadeDuration);
+                }
+            };
+
+            const handleAudioEnded = (e) => {
+                if (this.fading) return; 
+                if (this.playbackMode === 'loop') {
+                    this.activeAudio.currentTime = 0; this.activeAudio.play();
+                } else {
+                    if (this.playlist.length <= 1) document.getElementById('play-btn').classList.remove('active');
+                    
+                    const nextBtn = document.getElementById('next');
+                    nextBtn.classList.add('pulse-trigger');
+                    setTimeout(() => nextBtn.classList.remove('pulse-trigger'), 140);
+                    
+                    this.move(1);
+                }
+            };
+            this.deckA.ontimeupdate = this.deckB.ontimeupdate = handleTimeUpdate;
+            this.deckA.onended = this.deckB.onended = handleAudioEnded;
+        },
+
+        triggerCrossfade(duration) {
+            if (this.fading || this.playlist.length < 2) return;
+            this.fading = true;
+
+            let nextIndex = this.playbackMode === 'shuffle' ? Math.floor(Math.random() * this.playlist.length) : (this.currentIndex + 1) % this.playlist.length;
+            const nextTrack = this.playlist[nextIndex];
+            const nextAudio = this.inactiveAudio;
+            if (!nextAudio) { this.fading = false; return; }
+            
+            const currentGain = this.activeGain;
+            const nextGain = this.inactiveGain;
+            nextAudio.src = nextTrack.url; nextAudio.currentTime = 0;
+            
+            if(this.ctx) {
+                const now = this.ctx.currentTime;
+                currentGain.gain.setValueAtTime(currentGain.gain.value, now);
+                currentGain.gain.linearRampToValueAtTime(0.0, now + duration);
+                nextGain.gain.setValueAtTime(0.0, now);
+                nextGain.gain.linearRampToValueAtTime(1.0, now + duration);
+            }
+
+            nextAudio.play().then(() => {
+                this.activeDeck = this.activeDeck === 'A' ? 'B' : 'A';
+                this.currentIndex = nextIndex;
+                
+                const isDefaultColor = !this.titleEl.style.color || this.titleEl.style.color === "var(--accent-red)";
+                if (isDefaultColor) this.updateTitle(nextTrack.name, "var(--accent-red)");
+                
+                document.title = nextTrack.name;
+                this.updateMediaSessionMetadata();
+                this.render();
+                
+                setTimeout(() => { 
+                    if (this.inactiveAudio) this.inactiveAudio.pause(); 
+                    this.fading = false; 
+                }, duration * 1000);
+            }).catch(() => { this.fading = false; });
+        },
+
+        setupMediaSession() {
+            if ('mediaSession' in navigator) {
+                try {
+                    navigator.mediaSession.setActionHandler('play', () => this.play());
+                    navigator.mediaSession.setActionHandler('pause', () => this.toggle());
+                    navigator.mediaSession.setActionHandler('previoustrack', () => this.move(-1));
+                    navigator.mediaSession.setActionHandler('nexttrack', () => this.move(1));
+                } catch (e) {
+                    console.warn("Błąd ustawiania akcji MediaSession:", e);
+                }
+            }
+        },
+
+        updateMediaSessionMetadata() {
+            if ('mediaSession' in navigator && this.playlist[this.currentIndex]) {
+                try {
+                    navigator.mediaSession.metadata = new MediaMetadata({
+                        title: this.playlist[this.currentIndex].name,
+                        artist: 'ION Audio System',
+                        album: 'ION Player'
+                    });
+                } catch (e) {
+                    console.warn("Nie udało się zaktualizować MediaMetadata:", e);
+                }
+            }
+        },
+
+        loadTrack(i) {
+            if (!this.playlist[i]) return;
+            this.currentIndex = i;
+            const track = this.playlist[i];
+            this.fading = false; 
+            if(this.gainA && this.gainB) {
+                this.gainA.gain.setValueAtTime(this.activeDeck === 'A' ? 1.0 : 0.0, this.ctx.currentTime);
+                this.gainB.gain.setValueAtTime(this.activeDeck === 'B' ? 1.0 : 0.0, this.ctx.currentTime);
+            }
+            this.activeAudio.src = track.url;
+            
+            this.updateTitle(track.name, "var(--accent-red)");
+            document.title = track.name;
+            this.updateMediaSessionMetadata();
+            this.render();
+        },
+
+        deleteTrack(id, index, event) {
+            event.stopPropagation();
+            const tx = this.db.transaction("songs", "readwrite");
+            tx.objectStore("songs").delete(id);
+            tx.oncomplete = () => {
+                const wasActive = (index === this.currentIndex);
+                URL.revokeObjectURL(this.playlist[index].url);
+                this.playlist.splice(index, 1);
+                
+                if (this.playlist.length === 0) {
+                    this.activeAudio.pause(); this.activeAudio.src = ""; this.currentIndex = 0;
+                    this.updateTitle("TRYB CZUWANIA // ION CORE", "var(--accent-red)");
+                    document.getElementById('play-btn').classList.remove('active');
+                    document.getElementById('time-cur').innerText = "0:00"; document.getElementById('time-dur').innerText = "0:00"; document.getElementById('seek').value = 0;
+                } else if (wasActive) {
+                    if (this.currentIndex >= this.playlist.length) this.currentIndex = 0;
+                    this.loadTrack(this.currentIndex); if (!this.activeAudio.paused) this.play();
+                } else if (index < this.currentIndex) {
+                    this.currentIndex--;
+                }
+                this.render();
+            };
+        },
+
+        fmt(s) { return isNaN(s) ? "0:00" : Math.floor(s/60) + ":" + String(Math.floor(s%60)).padStart(2,'0'); },
+        async saveFiles(files) {
+            const tx = this.db.transaction("songs", "readwrite");
+            for(let f of files) tx.objectStore("songs").add({name: f.name.replace(/\.[^/.]+$/, ""), data: f});
+            tx.oncomplete = () => this.loadFromDB();
+        },
+
+        async loadFromDB() {
+            const req = this.db.transaction("songs", "readonly").objectStore("songs").getAll();
+            req.onsuccess = () => {
+                this.playlist = req.result.map(s => ({id: s.id, name: s.name, url: URL.createObjectURL(s.data)}));
+                this.render();
+                if(this.playlist.length > 0 && !this.activeAudio.src) this.loadTrack(0);
+            };
+        },
+
+        render() {
+            const listEl = document.getElementById('list');
+            listEl.innerHTML = this.playlist.map((t, i) => `
+                <div class="track-item ${i===this.currentIndex?'active':''}" onclick="ION.loadTrack(${i}); ION.play();">
+                    <div class="track-name">${i+1}. ${t.name}</div>
+                    <div class="track-del" onclick="ION.deleteTrack(${t.id}, ${i}, event)">&times;</div>
+                </div>`).join('');
+
+            const activeItem = listEl.querySelector('.track-item.active');
+            if (activeItem) {
+                activeItem.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+            }
+        },
+
+        play() { 
+            this.setupAudioPipeline(); 
+            if(this.ctx && this.ctx.state === 'suspended') this.ctx.resume();
+            if(this.activeAudio.src) { 
+                this.activeAudio.play(); 
+                this.playIcon.setAttribute('d', this.icons.pause); 
+                document.getElementById('play-btn').classList.add('active'); 
+                this.updateMediaSessionMetadata();
+            }
+        },
+        
+        toggle() {
+            if(!this.activeAudio.src && this.playlist.length > 0) this.loadTrack(0);
+            this.setupAudioPipeline();
+            if(this.ctx && this.ctx.state === 'suspended') this.ctx.resume();
+            
+            if(this.activeAudio.paused) { 
+                if(this.activeAudio.src) { 
+                    this.activeAudio.play(); 
+                    this.playIcon.setAttribute('d', this.icons.pause); 
+                    document.getElementById('play-btn').classList.add('active'); 
+                    this.updateMediaSessionMetadata();
+                }
+            } else { 
+                this.activeAudio.pause(); 
+                this.playIcon.setAttribute('d', this.icons.play); 
+                document.getElementById('play-btn').classList.remove('active');
+            }
+        },
+
+        move(dir) {
+            if (this.playlist.length === 0) return;
+            let next = (this.playbackMode === 'shuffle' && dir > 0) ? Math.floor(Math.random() * this.playlist.length) : (this.currentIndex + dir + this.playlist.length) % this.playlist.length;
+            this.loadTrack(next); this.play();
+        },
+
+        registerServiceWorker() {
+            if ('serviceWorker' in navigator) {
+                const swCode = `
+                    self.addEventListener('install', e => self.skipWaiting());
+                    self.addEventListener('activate', e => e.waitUntil(self.clients.claim()));
+                    self.addEventListener('fetch', e => {
+                        e.respondWith(fetch(e.request).catch(() => caches.match(e.request)));
+                    });
+                `;
+                const blob = new Blob([swCode], { type: 'application/javascript' });
+                const swUrl = URL.createObjectURL(blob);
+                
+                navigator.serviceWorker.register(swUrl, { scope: './' })
+                    .then(() => console.log("ION PWA Service Worker zarejestrowany pomyślnie."))
+                    .catch(err => console.warn("PWA Service Worker błąd:", err));
+            }
+        }
+    };
+
+    ION.init();
+</script>
+</body>
+</html>
