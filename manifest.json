@@ -1,14 +1,13 @@
 {
-  "name": "ION Radio Console",
+  "name": "ION Radio",
   "short_name": "ION Radio",
-  "start_url": "index.html",
+  "start_url": "./index.html",
   "display": "standalone",
-  "background_color": "#050505",
-  "theme_color": "#ff1a1a",
-  "orientation": "portrait",
+  "background_color": "#000000",
+  "theme_color": "#FF0000",
   "icons": [
     {
-      "src": "icon.png",
+      "src": "./icon.png",
       "sizes": "512x512",
       "type": "image/png"
     }
